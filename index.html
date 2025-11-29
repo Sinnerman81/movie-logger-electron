@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsidian Movie Logger (Electron)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        }
+        .obsidian-card {
+            background-color: #262626;
+            border-color: #3f3f3f;
+            color: #e0e0e0;
+        }
+        .obsidian-accent {
+            color: #7c3aed;
+        }
+        input, select {
+            background-color: #2a2a2a !important;
+            color: #e0e0e0 !important;
+            border-color: #3f3f3f !important;
+        }
+        input::placeholder {
+            color: #888888 !important;
+        }
+        input:focus, select:focus {
+            border-color: #7c3aed !important;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1) !important;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto obsidian-card shadow-xl rounded-lg p-6 border">
+        <h1 class="text-3xl font-bold obsidian-accent mb-6 border-b border-gray-700 pb-2">🎥 Obsidian Movie Logger</h1>
+
+        <div id="path-config-area" class="mb-4 p-4 bg-red-900 border border-red-700 text-red-200 rounded-lg">
+            <p id="path-status" class="mb-2 font-semibold">⚠️ Vault Path Not Set</p>
+            <div class="flex gap-2">
+                <button id="set-path-button" class="p-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition duration-150 shadow-md text-sm">
+                    Select Obsidian Movie Folder
+                </button>
+                <button id="set-api-key-button" class="p-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition duration-150 shadow-md text-sm">
+                    Set OMDb API Key
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-8 p-4 bg-gray-900 border border-gray-700 rounded-lg">
+            <h2 class="text-xl font-semibold text-gray-200 mb-3">1. Find Your Movie</h2>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input
+                    type="text"
+                    id="search-term"
+                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Enter movie title (e.g., Inception)"
+                />
+                <button
+                    id="search-button"
+                    class="p-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition duration-150 shadow-md"
+                >
+                    Search
+                </button>
+            </div>
+        </div>
+
+        <div id="message-area" class="hidden p-3 mb-4 rounded-lg border"></div>
+        
+        <div id="movie-details-section" class="hidden">
+            <div class="mb-8 p-4 obsidian-card border border-gray-700 rounded-lg">
+                <h2 id="movie-title-year" class="text-2xl font-bold obsidian-accent mb-4"></h2>
+                
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-y-2 mb-4 text-sm">
+                    <p><strong class="text-gray-400">Genre:</strong> <span id="movie-genre"></span></p>
+                    <p><strong class="text-gray-400">Runtime:</strong> <span id="movie-runtime"></span></p>
+                    <p><strong class="text-gray-400">MPAA Rating:</strong> <span id="movie-rated"></span></p>
+                    <p class="col-span-2 md:col-span-3"><strong class="text-gray-400">Main Actors:</strong> <span id="movie-actors"></span></p>
+                </div>
+
+                <h3 class="text-lg font-semibold text-gray-300 mt-4 mb-2">Summary (Plot)</h3>
+                <p id="movie-plot" class="text-gray-300 italic text-sm border-l-4 border-purple-500 pl-3 py-1 bg-gray-800 rounded-r-lg"></p>
+            </div>
+
+            <div class="mb-8 p-4 bg-yellow-900 border border-yellow-700 rounded-lg">
+                <h2 class="text-xl font-semibold text-gray-200 mb-3">2. Capture Your Data</h2>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                        <label for="user-rating" class="block text-sm font-medium text-gray-300 mb-1">Your Rating (1-10)</label>
+                        <select
+                            id="user-rating"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+                        >
+                        </select>
+                    </div>
+                    
+                    <div class="flex-1">
+                        <label for="media-type" class="block text-sm font-medium text-gray-300 mb-1">Media Format</label>
+                        <select
+                            id="media-type"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+                        >
+                        </select>
+                    </div>
+                </div>
+
+                <button
+                    id="log-movie-button"
+                    class="w-full mt-6 p-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition duration-150 shadow-lg"
+                >
+                    Log & Save Movie Directly to Obsidian
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for API Key Input -->
+    <div id="api-key-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="obsidian-card rounded-lg shadow-lg p-6 max-w-sm w-full mx-4 border border-gray-700">
+            <h3 class="text-lg font-bold text-gray-200 mb-4">Set OMDb API Key</h3>
+            <input
+                type="password"
+                id="api-key-input"
+                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                placeholder="Enter your OMDb API key"
+            />
+            <div class="flex gap-3">
+                <button id="api-key-cancel-btn" class="flex-1 p-2 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition">
+                    Cancel
+                </button>
+                <button id="api-key-save-btn" class="flex-1 p-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition">
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Overwrite Confirmation -->
+    <div id="overwrite-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="obsidian-card rounded-lg shadow-lg p-6 max-w-sm w-full mx-4 border border-gray-700">
+            <h3 class="text-lg font-bold text-gray-200 mb-2">File Already Exists</h3>
+            <p id="overwrite-message" class="text-gray-300 mb-4">A file with this name already exists. What would you like to do?</p>
+            <div class="flex gap-3">
+                <button id="overwrite-cancel-btn" class="flex-1 p-2 bg-gray-700 text-gray-200 rounded-lg font-medium hover:bg-gray-600 transition">
+                    Cancel
+                </button>
+                <button id="overwrite-copy-btn" class="flex-1 p-2 bg-yellow-700 text-white rounded-lg font-medium hover:bg-yellow-600 transition">
+                    Create Copy
+                </button>
+                <button id="overwrite-replace-btn" class="flex-1 p-2 bg-red-700 text-white rounded-lg font-medium hover:bg-red-600 transition">
+                    Overwrite
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Global Variables ---
+        // API key moved to main process - renderer does not hold the key
+        const API_KEY = null;
+        let currentMovieData = null;
+        let vaultPathSet = false; // Flag to track path status
+
+        const mediaOptions = ['DVD', 'Blu-ray', 'Fandango', 'Apple TV', 'Amazon Prime', 'Google TV'];
+        const ratingOptions = Array.from({ length: 10 }, (_, i) => i + 1);
+
+        // --- DOM Elements ---
+        const $ = (id) => document.getElementById(id);
+
+        const searchTermInput = $('search-term');
+        const searchButton = $('search-button');
+        const messageArea = $('message-area');
+        const movieDetailsSection = $('movie-details-section');
+        const logMovieButton = $('log-movie-button');
+        const setPathButton = $('set-path-button');
+        const pathStatus = $('path-status');
+        const pathConfigArea = $('path-config-area');
+        
+        const userRatingSelect = $('user-rating');
+        const mediaTypeSelect = $('media-type');
+
+
+        // --- Utility Functions ---
+
+        /**
+         * Displays a message (error or success)
+         */
+        function displayMessage(msg, isError = true) {
+            messageArea.textContent = msg;
+            messageArea.classList.remove('hidden');
+            // Reset classes, then apply the correct style
+            messageArea.classList.remove('bg-red-100', 'text-red-700', 'border-red-400', 'bg-green-100', 'text-green-700', 'border-green-400');
+            if (isError) {
+                messageArea.classList.add('bg-red-100', 'text-red-700', 'border-red-400');
+            } else {
+                messageArea.classList.add('bg-green-100', 'text-green-700', 'border-green-400');
+            }
+            messageArea.classList.add('border');
+        }
+
+        function hideAllOutputs() {
+            messageArea.classList.add('hidden');
+        }
+
+        function populateDropdowns() {
+            // Rating
+            userRatingSelect.innerHTML = ratingOptions.map(r => 
+                `<option value="${r}" ${r === 7 ? 'selected' : ''}>${r}</option>`
+            ).join('');
+
+            // Media Type
+            mediaTypeSelect.innerHTML = mediaOptions.map(m => 
+                `<option value="${m}" ${m === 'Blu-ray' ? 'selected' : ''}>${m}</option>`
+            ).join('');
+        }
+
+        // --- Configuration and Status Handlers ---
+
+        // Modal Helpers
+        function showApiKeyModal() {
+            $('api-key-input').value = '';
+            $('api-key-modal').classList.remove('hidden');
+            $('api-key-input').focus();
+        }
+
+        function hideApiKeyModal() {
+            $('api-key-modal').classList.add('hidden');
+        }
+
+        function showOverwriteModal() {
+            $('overwrite-modal').classList.remove('hidden');
+        }
+
+        function hideOverwriteModal() {
+            $('overwrite-modal').classList.add('hidden');
+        }
+
+        let overwriteChoice = null;
+        async function waitForOverwriteChoice() {
+            return new Promise((resolve) => {
+                overwriteChoice = null;
+                showOverwriteModal();
+                const checkInterval = setInterval(() => {
+                    if (overwriteChoice !== null) {
+                        clearInterval(checkInterval);
+                        hideOverwriteModal();
+                        resolve(overwriteChoice); // 'cancel', 'copy', 'overwrite'
+                    }
+                }, 50);
+            });
+        }
+
+        async function updateVaultPathStatus(pathFound) {
+            vaultPathSet = pathFound;
+            
+            if (vaultPathSet) {
+                pathStatus.textContent = '✅ Vault Path Set';
+                setPathButton.textContent = 'Change Folder';
+                pathConfigArea.classList.remove('bg-red-100', 'border-red-400', 'text-red-700');
+                pathConfigArea.classList.add('bg-green-100', 'border-green-400', 'text-green-700');
+            } else {
+                pathStatus.textContent = '⚠️ Vault Path Not Set';
+                setPathButton.textContent = 'Select Obsidian Movie Folder';
+                pathConfigArea.classList.remove('bg-green-100', 'border-green-400', 'text-green-700');
+                pathConfigArea.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+            }
+        }
+        
+        async function handleSetVaultPath() {
+            const { success, path } = await window.electronAPI.setVaultPath();
+            if (success) {
+                updateVaultPathStatus(true);
+                displayMessage(`Vault path successfully set to: ${path}`, false);
+            } else {
+                updateVaultPathStatus(false);
+                displayMessage('Vault path configuration canceled or failed.', true);
+            }
+        }
+
+        // --- API and UI Handlers ---
+
+        /**
+         * Fetches movie data from the OMDb API.
+         */
+        async function handleSearch() {
+            const title = searchTermInput.value.trim();
+            if (!title) {
+                displayMessage('Please enter a movie title.');
+                return;
+            }
+
+            hideAllOutputs();
+            displayMessage('Searching...', false); // Use green for non-error messages
+
+            try {
+                // Request movie from main process so the API key stays out of the renderer
+                const res = await window.electronAPI.fetchMovie(title);
+                if (!res.success) {
+                    currentMovieData = null;
+                    displayMessage(`Movie lookup failed: ${res.error || 'Unknown error'}`);
+                    return;
+                }
+                const data = res.data;
+                if (data.Response === 'True') {
+                    currentMovieData = data;
+                    renderMovieDetails(data);
+                    messageArea.classList.add('hidden');
+                } else {
+                    currentMovieData = null;
+                    displayMessage(`Movie not found: ${data.Error}`);
+                }
+            } catch (err) {
+                currentMovieData = null;
+                displayMessage('An error occurred while fetching data. Check your network connection.');
+                console.error(err);
+            }
+        }
+
+        function renderMovieDetails(data) {
+            $('movie-title-year').textContent = `${data.Title} (${data.Year})`;
+            $('movie-genre').textContent = data.Genre;
+            $('movie-runtime').textContent = data.Runtime;
+            $('movie-rated').textContent = data.Rated;
+            $('movie-actors').textContent = data.Actors;
+            $('movie-plot').textContent = data.Plot;
+            
+            movieDetailsSection.classList.remove('hidden');
+        }
+
+        /**
+         * Generates Markdown and calls the Electron API to write the file.
+         */
+        async function handleLogAndSave() {
+            if (!currentMovieData) {
+                displayMessage('Please search for a movie first.', true);
+                return;
+            }
+
+            if (!vaultPathSet) {
+                 displayMessage('ERROR: Please set your Obsidian Vault Folder path first.', true);
+                return;
+            }
+
+            const data = currentMovieData;
+            const userRating = userRatingSelect.value;
+            const mediaType = mediaTypeSelect.value;
+
+            // --- Tag Generation Logic ---
+            const actorTags = (data.Actors && data.Actors !== 'N/A') ? data.Actors.split(',').map(actor =>
+                actor.trim().toLowerCase().replace(/\s/g, '_')
+            ) : [];
+            const genreTags = (data.Genre && data.Genre !== 'N/A') ? data.Genre.split(',').map(genre =>
+                genre.trim().toLowerCase().replace(/\s/g, '-')
+            ) : [];
+            const allTags = [...actorTags, ...genreTags];
+
+            // --- Markdown & YAML Generation (Same as before) ---
+            // Quote YAML strings safely using JSON.stringify for basic escaping
+            // Build a movie payload and request main process to save it (main will assemble markdown/YAML)
+            const payload = {
+                Title: data.Title,
+                Year: data.Year,
+                Rated: data.Rated,
+                Runtime: data.Runtime,
+                Genre: data.Genre,
+                Actors: data.Actors,
+                Plot: data.Plot,
+                Poster: data.Poster,
+                userRating: userRating + '/10',
+                mediaType: mediaType,
+                tags: allTags,
+            };
+
+            displayMessage('Saving file...', false);
+
+            const result = await window.electronAPI.saveMovie(payload);
+
+            if (result.success) {
+                displayMessage(result.message, false);
+            } else {
+                displayMessage(`File Save Failed: ${result.message}`, true);
+            }
+        }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            populateDropdowns();
+
+            // Set Initial Path Status (assume failure initially, but allow user to set)
+            // Query main process for actual vault path status
+            window.electronAPI.checkVaultPath().then(res => updateVaultPathStatus(!!res.configured));
+
+            // Attach Event Listeners
+            searchButton.addEventListener('click', handleSearch);
+            searchTermInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') handleSearch();
+            });
+            logMovieButton.addEventListener('click', handleLogAndSave);
+            setPathButton.addEventListener('click', handleSetVaultPath);
+
+            // API key setter
+            const setApiKeyButton = $('set-api-key-button');
+            setApiKeyButton.addEventListener('click', () => {
+                showApiKeyModal();
+            });
+
+            // API key modal listeners
+            $('api-key-save-btn').addEventListener('click', async () => {
+                const key = $('api-key-input').value.trim();
+                if (!key) {
+                    displayMessage('API key cannot be empty.', true);
+                    return;
+                }
+                hideApiKeyModal();
+                const res = await window.electronAPI.setOmdbKey(key);
+                if (res && res.success) {
+                    displayMessage('OMDb API key saved. You can now search for movies.', false);
+                } else {
+                    displayMessage(`Failed to save API key: ${res.message || 'unknown error'}`, true);
+                }
+            });
+
+            $('api-key-cancel-btn').addEventListener('click', () => {
+                hideApiKeyModal();
+            });
+
+            $('api-key-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') $('api-key-save-btn').click();
+                if (e.key === 'Escape') hideApiKeyModal();
+            });
+
+            // Overwrite modal listeners
+            $('overwrite-cancel-btn').addEventListener('click', () => {
+                overwriteChoice = 'cancel';
+            });
+
+            $('overwrite-copy-btn').addEventListener('click', () => {
+                overwriteChoice = 'copy';
+            });
+
+            $('overwrite-replace-btn').addEventListener('click', () => {
+                overwriteChoice = 'overwrite';
+            });
+        });
+    </script>
+
+</body>
+</html>
